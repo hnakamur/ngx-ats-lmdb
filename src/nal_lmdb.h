@@ -12,6 +12,7 @@ typedef struct nal_val {
     const char *mv_data;
 } nal_val;
 
+const char *nal_strerror(int err);
 int nal_txn_begin(nal_txn_ptr parent, nal_txn_ptr *txn);
 int nal_readonly_txn_begin(nal_txn_ptr parent, nal_txn_ptr *txn);
 int nal_txn_commit(nal_txn_ptr txn);

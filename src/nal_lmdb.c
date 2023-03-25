@@ -69,6 +69,11 @@ int nal_env_init(const char *env_path, size_t max_databases, size_t map_size)
     return env_init_rc;
 }
 
+const char *nal_strerror(int err)
+{
+    return mdb_strerror(err);
+}
+
 int nal_txn_begin(nal_txn_ptr parent, nal_txn_ptr *txn)
 {
     MDB_txn *out;

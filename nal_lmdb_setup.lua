@@ -12,6 +12,7 @@ local function setup(shlib_name)
             const char *mv_data;
         } nal_val;
         
+        const char *nal_strerror(int err);
         int nal_txn_begin(nal_txn_ptr parent, nal_txn_ptr *txn);
         int nal_readonly_txn_begin(nal_txn_ptr parent, nal_txn_ptr *txn);
         int nal_txn_commit(nal_txn_ptr txn);
@@ -27,17 +28,26 @@ local function setup(shlib_name)
     local c_dbi_type = ffi.typeof("nal_dbi[1]")
     local c_val_type = ffi.typeof("nal_val[1]")
 
+    local MDB_SUCCESS = 0
     local MDB_NOTFOUND = -30798
 
+    local function nal_strerror(err)
+        return ffi.string(S.nal_strerror(err))
+    end
+
     local function env_init(env_path, max_databases, map_size)
-        return S.nal_env_init(env_path, max_databases, map_size)
+        local rc = S.nal_env_init(env_path, max_databases, map_size)
+        if rc ~= MDB_SUCCESS then
+            return nal_strerror(rc)
+        end
+        return nil
     end
 
     local function txn_begin(parent)
         local txn = ffi.new(c_txn_ptr_type)
         local rc = S.nal_txn_begin(parent, txn)
-        if rc ~= 0 then
-            return nil, rc
+        if rc ~= MDB_SUCCESS then
+            return nil, nal_strerror(rc)
         end
         return txn[0]
     end
@@ -45,8 +55,8 @@ local function setup(shlib_name)
     local function readonly_txn_begin(parent)
         local txn = ffi.new(c_txn_ptr_type)
         local rc = S.nal_readonly_txn_begin(parent, txn)
-        if rc ~= 0 then
-            return nil, rc
+        if rc ~= MDB_SUCCESS then
+            return nil, nal_strerror(rc)
         end
         return txn[0]
     end
@@ -62,8 +72,8 @@ local function setup(shlib_name)
     local function db_open(txn, name)
         local dbi = ffi.new(c_dbi_type)
         local rc = S.nal_dbi_open(txn, name, dbi)
-        if rc ~= 0 then
-            return nil, rc
+        if rc ~= MDB_SUCCESS then
+            return nil, nal_strerror(rc)
         end
         return dbi[0]
     end
@@ -71,8 +81,8 @@ local function setup(shlib_name)
     local function readonly_db_open(txn, name)
         local dbi = ffi.new(c_dbi_type)
         local rc = S.nal_readonly_dbi_open(txn, name, dbi)
-        if rc ~= 0 then
-            return nil, rc
+        if rc ~= MDB_SUCCESS then
+            return nil, nal_strerror(rc)
         end
         return dbi[0]
     end
@@ -96,7 +106,7 @@ local function setup(shlib_name)
             if rc == MDB_NOTFOUND then
                 return false
             end
-            return false, rc
+            return false, S.nal_strerror(rc)
         end
         return true
     end
@@ -111,7 +121,7 @@ local function setup(shlib_name)
             if rc == MDB_NOTFOUND then
                 return nil, false
             end
-            return nil, false, rc
+            return nil, false, S.nal_strerror(rc)
         end
         return ffi.string(nal_data[0].mv_data, nal_data[0].mv_size), true
     end
