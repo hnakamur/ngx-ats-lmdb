@@ -62,7 +62,11 @@ local function setup(shlib_name)
     end
 
     local function txn_commit(txn)
-        return S.nal_txn_commit(txn)
+        local rc = S.nal_txn_commit(txn)
+        if rc ~= MDB_SUCCESS then
+            return nal_strerror(rc)
+        end
+        return nil
     end
 
     local function txn_abort(txn)
@@ -133,76 +137,54 @@ local function setup(shlib_name)
     local txn_mt = {}
     txn_mt.__index = txn_mt
 
-    function txn_mt:get(key, db)
-        return nal_get(self.txn, self.dbi[db], key)
+    function txn_mt:db_open(name)
+        return  db_open(self, name)
     end
 
-    function txn_mt:put(key, data, db)
-        return nal_put(self.txn, self.dbi[db], key, data)
+    function txn_mt:readonly_db_open(name)
+        return  readonly_db_open(self, name)
     end
 
-    function txn_mt:del(key, db)
-        return nal_del(self.txn, self.dbi[db], key)
+    function txn_mt:get(key, dbi)
+        return nal_get(self, dbi, key)
     end
 
-    local function with_txn(parent, databases, f)
-        local inner_txn, err = txn_begin(parent)
+    function txn_mt:put(key, data, dbi)
+        return nal_put(self, dbi, key, data)
+    end
+
+    function txn_mt:del(key, dbi)
+        return nal_del(self, dbi, key)
+    end
+
+    ffi.metatype("struct MDB_txn", txn_mt)
+
+    local function with_txn(parent, f)
+        local txn, err = txn_begin(parent)
         if err ~= nil then
             return err
-        end
-
-        local txn = {
-            txn = inner_txn,
-            dbi = {},
-        }
-        setmetatable(txn, txn_mt)
-
-        for _, db in ipairs(databases) do
-            local dbi
-            dbi, err = db_open(inner_txn, db)
-            if err ~= nil then
-                txn_abort(inner_txn)
-                return err
-            end
-            txn.dbi[db] = dbi
         end
 
         err = f(txn)
         if err ~= nil then
-            txn_abort(inner_txn)
+            txn_abort(txn)
             return err
         end
-        return txn_commit(inner_txn)
+        return txn_commit(txn)
     end
     
-    local function with_readonly_txn(parent, databases, f)
-        local inner_txn, err = readonly_txn_begin(parent)
+    local function with_readonly_txn(parent, f)
+        local txn, err = readonly_txn_begin(parent)
         if err ~= nil then
             return err
-        end
-
-        local txn = {
-            txn = inner_txn,
-            dbi = {},
-        }
-        setmetatable(txn, txn_mt)
-
-        for _, db in ipairs(databases) do
-            local dbi
-            dbi, err = readonly_db_open(inner_txn, db)
-            if err ~= nil then
-                txn_abort(inner_txn)
-                return err
-            end
-            txn.dbi[db] = dbi
         end
 
         err = f(txn)
         if err ~= nil then
-            txn_abort(inner_txn)
+            txn_abort(txn)
             return err
         end
-        return txn_commit(inner_txn)
+        return txn_commit(txn)
     end
 
     return {
