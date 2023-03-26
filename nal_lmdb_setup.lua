@@ -94,7 +94,11 @@ local function setup(shlib_name)
         nal_key[0].mv_data = key
         nal_data[0].mv_size = #data
         nal_data[0].mv_data = data
-        return S.nal_put(txn, dbi, nal_key, nal_data)
+        local rc = S.nal_put(txn, dbi, nal_key, nal_data)
+        if rc ~= MDB_SUCCESS then
+            return nal_strerror(rc)
+        end
+        return nil
     end
 
     local function nal_del(txn, dbi, key)
