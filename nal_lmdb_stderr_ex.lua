@@ -59,8 +59,8 @@ err = lmdb.with_txn(nil, function(txn)
         return err
     end
 
-    found, err = txn:del("key1", db1)
-    print(string.format("del found=%s, err=%s", found, err))
+    err = txn:del("key1", db1)
+    print(string.format("del err=%s", err))
     if err ~= nil then
         return err
     end

@@ -128,13 +128,10 @@ local function setup(shlib_name)
         nal_key[0].mv_size = #key
         nal_key[0].mv_data = key
         local rc = S.nal_del(self, dbi, nal_key)
-        if rc ~= 0 then
-            if rc == MDB_NOTFOUND then
-                return false
-            end
-            return false, S.nal_strerror(rc)
+        if rc ~= 0 and rc ~= MDB_NOTFOUND then
+            return S.nal_strerror(rc)
         end
-        return true
+        return nil
     end
 
     ffi.metatype("struct MDB_txn", txn_mt)
