@@ -102,11 +102,11 @@ local function setup(shlib_name)
         local rc = S.nal_get(self, dbi, nal_key, nal_data)
         if rc ~= 0 then
             if rc == MDB_NOTFOUND then
-                return nil, false
+                return nil
             end
-            return nil, false, S.nal_strerror(rc)
+            return nil, S.nal_strerror(rc)
         end
-        return ffi.string(nal_data[0].mv_data, nal_data[0].mv_size), true
+        return ffi.string(nal_data[0].mv_data, nal_data[0].mv_size)
     end
 
     function txn_mt:put(key, data, dbi)
