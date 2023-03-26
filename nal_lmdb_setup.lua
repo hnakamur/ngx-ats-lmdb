@@ -73,58 +73,33 @@ local function setup(shlib_name)
         S.nal_txn_abort(txn)
     end
 
-    local function db_open(txn, name)
+    local txn_mt = {}
+    txn_mt.__index = txn_mt
+
+    function txn_mt:db_open(name)
         local dbi = ffi.new(c_dbi_type)
-        local rc = S.nal_dbi_open(txn, name, dbi)
+        local rc = S.nal_dbi_open(self, name, dbi)
         if rc ~= MDB_SUCCESS then
             return nil, nal_strerror(rc)
         end
         return dbi[0]
     end
 
-    local function readonly_db_open(txn, name)
+    function txn_mt:readonly_db_open(name)
         local dbi = ffi.new(c_dbi_type)
-        local rc = S.nal_readonly_dbi_open(txn, name, dbi)
+        local rc = S.nal_readonly_dbi_open(self, name, dbi)
         if rc ~= MDB_SUCCESS then
             return nil, nal_strerror(rc)
         end
         return dbi[0]
     end
 
-    local function nal_put(txn, dbi, key, data)
-        local nal_key = ffi.new(c_val_type)
-        local nal_data = ffi.new(c_val_type)
-        nal_key[0].mv_size = #key
-        nal_key[0].mv_data = key
-        nal_data[0].mv_size = #data
-        nal_data[0].mv_data = data
-        local rc = S.nal_put(txn, dbi, nal_key, nal_data)
-        if rc ~= MDB_SUCCESS then
-            return nal_strerror(rc)
-        end
-        return nil
-    end
-
-    local function nal_del(txn, dbi, key)
-        local nal_key = ffi.new(c_val_type)
-        nal_key[0].mv_size = #key
-        nal_key[0].mv_data = key
-        local rc = S.nal_del(txn, dbi, nal_key)
-        if rc ~= 0 then
-            if rc == MDB_NOTFOUND then
-                return false
-            end
-            return false, S.nal_strerror(rc)
-        end
-        return true
-    end
-
-    local function nal_get(txn, dbi, key)
+    function txn_mt:get(key, dbi)
         local nal_key = ffi.new(c_val_type)
         nal_key[0].mv_size = #key
         nal_key[0].mv_data = key
         local nal_data = ffi.new(c_val_type)
-        local rc = S.nal_get(txn, dbi, nal_key, nal_data)
+        local rc = S.nal_get(self, dbi, nal_key, nal_data)
         if rc ~= 0 then
             if rc == MDB_NOTFOUND then
                 return nil, false
@@ -134,27 +109,32 @@ local function setup(shlib_name)
         return ffi.string(nal_data[0].mv_data, nal_data[0].mv_size), true
     end
 
-    local txn_mt = {}
-    txn_mt.__index = txn_mt
-
-    function txn_mt:db_open(name)
-        return  db_open(self, name)
-    end
-
-    function txn_mt:readonly_db_open(name)
-        return  readonly_db_open(self, name)
-    end
-
-    function txn_mt:get(key, dbi)
-        return nal_get(self, dbi, key)
-    end
-
     function txn_mt:put(key, data, dbi)
-        return nal_put(self, dbi, key, data)
+        local nal_key = ffi.new(c_val_type)
+        local nal_data = ffi.new(c_val_type)
+        nal_key[0].mv_size = #key
+        nal_key[0].mv_data = key
+        nal_data[0].mv_size = #data
+        nal_data[0].mv_data = data
+        local rc = S.nal_put(self, dbi, nal_key, nal_data)
+        if rc ~= MDB_SUCCESS then
+            return nal_strerror(rc)
+        end
+        return nil
     end
 
     function txn_mt:del(key, dbi)
-        return nal_del(self, dbi, key)
+        local nal_key = ffi.new(c_val_type)
+        nal_key[0].mv_size = #key
+        nal_key[0].mv_data = key
+        local rc = S.nal_del(self, dbi, nal_key)
+        if rc ~= 0 then
+            if rc == MDB_NOTFOUND then
+                return false
+            end
+            return false, S.nal_strerror(rc)
+        end
+        return true
     end
 
     ffi.metatype("struct MDB_txn", txn_mt)
