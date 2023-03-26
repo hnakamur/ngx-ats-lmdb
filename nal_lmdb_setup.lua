@@ -130,17 +130,85 @@ local function setup(shlib_name)
         return ffi.string(nal_data[0].mv_data, nal_data[0].mv_size), true
     end
 
+    local txn_mt = {}
+    txn_mt.__index = txn_mt
+
+    function txn_mt:get(key, db)
+        return nal_get(self.txn, self.dbi[db], key)
+    end
+
+    function txn_mt:put(key, data, db)
+        return nal_put(self.txn, self.dbi[db], key, data)
+    end
+
+    function txn_mt:del(key, db)
+        return nal_del(self.txn, self.dbi[db], key)
+    end
+
+    local function with_txn(parent, databases, f)
+        local inner_txn, err = txn_begin(parent)
+        if err ~= nil then
+            return err
+        end
+
+        local txn = {
+            txn = inner_txn,
+            dbi = {},
+        }
+        setmetatable(txn, txn_mt)
+
+        for _, db in ipairs(databases) do
+            local dbi
+            dbi, err = db_open(inner_txn, db)
+            if err ~= nil then
+                txn_abort(inner_txn)
+                return err
+            end
+            txn.dbi[db] = dbi
+        end
+
+        err = f(txn)
+        if err ~= nil then
+            txn_abort(inner_txn)
+            return err
+        end
+        return txn_commit(inner_txn)
+    end
+    
+    local function with_readonly_txn(parent, databases, f)
+        local inner_txn, err = readonly_txn_begin(parent)
+        if err ~= nil then
+            return err
+        end
+
+        local txn = {
+            txn = inner_txn,
+            dbi = {},
+        }
+        setmetatable(txn, txn_mt)
+
+        for _, db in ipairs(databases) do
+            local dbi
+            dbi, err = readonly_db_open(inner_txn, db)
+            if err ~= nil then
+                txn_abort(inner_txn)
+                return err
+            end
+            txn.dbi[db] = dbi
+        end
+
+        err = f(txn)
+        if err ~= nil then
+            txn_abort(inner_txn)
+            return err
+        end
+        return txn_commit(inner_txn)
+    end
+
     return {
         env_init = env_init,
-        txn_begin = txn_begin,
-        readonly_txn_begin = readonly_txn_begin,
-        txn_commit = txn_commit,
-        txn_abort = txn_abort,
-        db_open = db_open,
-        readonly_db_open = readonly_db_open,
-        nal_put = nal_put,
-        nal_del = nal_del,
-        nal_get = nal_get,
+        with_txn = with_txn,
+        with_readonly_txn = with_readonly_txn,
     }
 end
 
