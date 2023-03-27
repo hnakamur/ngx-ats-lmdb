@@ -45,7 +45,7 @@ static void nal_do_init_env(void)
     }
 
     unsigned int flags = 0;
-    mdb_mode_t mode = 0600;
+    mdb_mode_t mode = 0666;
     rc = mdb_env_open(env.env, env.env_path, flags, mode);
     if (rc != 0) {
         nal_log_error("mdb_env_open failed: %s", mdb_strerror(rc));
