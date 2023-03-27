@@ -137,8 +137,8 @@ local function setup(shlib_name)
 
     ffi.metatype("struct MDB_txn", txn_mt)
 
-    local function with_txn(parent, f)
-        local txn, err = txn_begin(parent)
+    local function with_txn(f)
+        local txn, err = txn_begin(nil)
         if err ~= nil then
             return err
         end
@@ -181,7 +181,7 @@ local function setup(shlib_name)
     end
 
     local function open_databases(databases)
-        return with_txn(nil, function(txn)
+        return with_txn(function(txn)
             for i, db in ipairs(databases) do
                 local dbi, err = dbi_open(txn, db)
                 if err ~= nil then
