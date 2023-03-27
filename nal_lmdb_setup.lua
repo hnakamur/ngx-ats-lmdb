@@ -33,7 +33,6 @@ local function setup(shlib_name)
 
     local MDB_SUCCESS = 0
     local MDB_NOTFOUND = -30798
-    local EAGAIN = 11
 
     local function nal_strerror(err)
         return ffi.string(S.nal_strerror(err))
@@ -65,6 +64,15 @@ local function setup(shlib_name)
         return txn[0]
     end
 
+    local function dbi_open(txn, name)
+        local dbi = ffi.new(c_dbi_type)
+        local rc = S.nal_dbi_open(txn, name, dbi)
+        if rc ~= MDB_SUCCESS then
+            return nil, nal_strerror(rc)
+        end
+        return dbi[0]
+    end
+
     local function txn_commit(txn)
         local rc = S.nal_txn_commit(txn)
         if rc ~= MDB_SUCCESS then
@@ -81,37 +89,18 @@ local function setup(shlib_name)
         return nil
     end
 
-    local function txn_abort(txn)
-        S.nal_txn_abort(txn)
-    end
+    local ro_txns = {}
+    local dbis = {}
 
     local txn_mt = {}
     txn_mt.__index = txn_mt
 
-    function txn_mt:db_open(name)
-        local dbi = ffi.new(c_dbi_type)
-        local rc = S.nal_dbi_open(self, name, dbi)
-        if rc ~= MDB_SUCCESS then
-            return nil, nal_strerror(rc)
-        end
-        return dbi[0]
-    end
-
-    function txn_mt:readonly_db_open(name)
-        local dbi = ffi.new(c_dbi_type)
-        local rc = S.nal_readonly_dbi_open(self, name, dbi)
-        if rc ~= MDB_SUCCESS then
-            return nil, nal_strerror(rc)
-        end
-        return dbi[0]
-    end
-
-    function txn_mt:get(key, dbi)
+    function txn_mt:get(key, db)
         local nal_key = ffi.new(c_val_type)
         nal_key[0].mv_size = #key
         nal_key[0].mv_data = key
         local nal_data = ffi.new(c_val_type)
-        local rc = S.nal_get(self, dbi, nal_key, nal_data)
+        local rc = S.nal_get(self, dbis[db], nal_key, nal_data)
         if rc ~= 0 then
             if rc == MDB_NOTFOUND then
                 return nil
@@ -121,25 +110,25 @@ local function setup(shlib_name)
         return ffi.string(nal_data[0].mv_data, nal_data[0].mv_size)
     end
 
-    function txn_mt:put(key, data, dbi)
+    function txn_mt:set(key, data, db)
         local nal_key = ffi.new(c_val_type)
         local nal_data = ffi.new(c_val_type)
         nal_key[0].mv_size = #key
         nal_key[0].mv_data = key
         nal_data[0].mv_size = #data
         nal_data[0].mv_data = data
-        local rc = S.nal_put(self, dbi, nal_key, nal_data)
+        local rc = S.nal_put(self, dbis[db], nal_key, nal_data)
         if rc ~= MDB_SUCCESS then
             return nal_strerror(rc)
         end
         return nil
     end
 
-    function txn_mt:del(key, dbi)
+    function txn_mt:del(key, db)
         local nal_key = ffi.new(c_val_type)
         nal_key[0].mv_size = #key
         nal_key[0].mv_data = key
-        local rc = S.nal_del(self, dbi, nal_key)
+        local rc = S.nal_del(self, dbis[db], nal_key)
         if rc ~= 0 and rc ~= MDB_NOTFOUND then
             return nal_strerror(rc)
         end
@@ -156,20 +145,15 @@ local function setup(shlib_name)
 
         err = f(txn)
         if err ~= nil then
-            txn_abort(txn)
+            S.nal_txn_abort(txn)
             return err
         end
         return txn_commit(txn)
     end
 
-    local ro_txns = {}
-    local dbis = {}
-
     local function get_ro_txn()
-        local i = table.maxn(ro_txns)
-        if i ~= 0 then
-            local txn = ro_txns[i]
-            ro_txns[i] = nil
+        local txn = table.remove(ro_txns)
+        if txn ~= nil then
             local err = txn_renew(txn)
             if err ~= nil then
                 return nil, err
@@ -181,6 +165,7 @@ local function setup(shlib_name)
     end
 
     local function put_ro_txn(txn)
+        S.nal_txn_reset(txn)
         table.insert(ro_txns, txn)
     end
 
@@ -190,40 +175,28 @@ local function setup(shlib_name)
             return err
         end
 
-        local err = f(txn)
-        S.nal_txn_reset(txn)
+        err = f(txn)
         put_ro_txn(txn)
         return err
     end
 
     local function open_databases(databases)
-        local txn, err = txn_begin(nil)
-        if err ~= nil then
-            return err
-        end
-
-        for i, db in ipairs(databases) do
-            local dbi
-            dbi, err = txn:db_open(db)
-            if err ~= nil then
-                return err
+        return with_txn(nil, function(txn)
+            for i, db in ipairs(databases) do
+                local dbi, err = dbi_open(txn, db)
+                if err ~= nil then
+                    return err
+                end
+                dbis[db] = dbi
             end
-            dbis[db] = dbi
-        end
-
-        err = txn_commit(txn)
-        if err ~= nil then
-            return err
-        end
-
-        return nil
+        end)
     end
 
     local function get(key, db)
         local val
         local err = with_readonly_txn(function(txn)
             local err2
-            val, err2 = txn:get(key, dbis[db])
+            val, err2 = txn:get(key, db)
             if err2 ~= nil then
                 return err2
             end
