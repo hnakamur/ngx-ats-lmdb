@@ -3,7 +3,8 @@ local function setup(shlib_name)
     local S = ffi.load(shlib_name)
 
     ffi.cdef[[
-        int nal_env_init(const char *env_path, size_t max_databases, size_t map_size);
+        int nal_env_init(const char *env_path, size_t max_databases,
+                         unsigned int max_readers, size_t map_size);
 
         typedef struct MDB_txn * nal_txn_ptr;
         typedef unsigned int	 nal_dbi;
@@ -11,12 +12,14 @@ local function setup(shlib_name)
             size_t	    mv_size;
             const char *mv_data;
         } nal_val;
-        
+
         const char *nal_strerror(int err);
         int nal_txn_begin(nal_txn_ptr parent, nal_txn_ptr *txn);
         int nal_readonly_txn_begin(nal_txn_ptr parent, nal_txn_ptr *txn);
         int nal_txn_commit(nal_txn_ptr txn);
-        void nal_txn_abort(nal_txn_ptr txn); 
+        void nal_txn_abort(nal_txn_ptr txn);
+        int nal_txn_renew(nal_txn_ptr txn);
+        void nal_txn_reset(nal_txn_ptr txn);
         int nal_dbi_open(nal_txn_ptr txn, const char *name, nal_dbi *dbi);
         int nal_readonly_dbi_open(nal_txn_ptr txn, const char *name, nal_dbi *dbi);
         int nal_put(nal_txn_ptr txn, nal_dbi dbi, nal_val *key, nal_val *data);
@@ -30,13 +33,14 @@ local function setup(shlib_name)
 
     local MDB_SUCCESS = 0
     local MDB_NOTFOUND = -30798
+    local EAGAIN = 11
 
     local function nal_strerror(err)
         return ffi.string(S.nal_strerror(err))
     end
 
-    local function env_init(env_path, max_databases, map_size)
-        local rc = S.nal_env_init(env_path, max_databases, map_size)
+    local function env_init(env_path, max_databases, max_readers, map_size)
+        local rc = S.nal_env_init(env_path, max_databases, max_readers, map_size)
         if rc ~= MDB_SUCCESS then
             return nal_strerror(rc)
         end
@@ -54,8 +58,14 @@ local function setup(shlib_name)
 
     local function readonly_txn_begin(parent)
         local txn = ffi.new(c_txn_ptr_type)
+    ::retry::
         local rc = S.nal_readonly_txn_begin(parent, txn)
         if rc ~= MDB_SUCCESS then
+            -- if rc == EAGAIN then
+            --     ngx.log(ngx.WARN, "nal_readonly_txn_begin retry after EAGAIN")
+            --     goto retry
+            -- end
+            ngx.log(ngx.ERR, string.format("nal_readonly_txn_begin rc=%d", rc))
             return nil, nal_strerror(rc)
         end
         return txn[0]
@@ -64,6 +74,15 @@ local function setup(shlib_name)
     local function txn_commit(txn)
         local rc = S.nal_txn_commit(txn)
         if rc ~= MDB_SUCCESS then
+            return nal_strerror(rc)
+        end
+        return nil
+    end
+
+    local function txn_renew(txn)
+        local rc = S.nal_txn_renew(txn)
+        if rc ~= MDB_SUCCESS then
+            ngx.log(ngx.ERR, string.format("nal_txn_renew rc=%d", rc))
             return nal_strerror(rc)
         end
         return nil
@@ -149,25 +168,66 @@ local function setup(shlib_name)
         end
         return txn_commit(txn)
     end
-    
-    local function with_readonly_txn(parent, f)
-        local txn, err = readonly_txn_begin(parent)
+
+    local ro_txns = {}
+
+    local function get_ro_txn()
+        local i = table.maxn(ro_txns)
+        if i ~= 0 then
+            if i > 1 then
+                ngx.log(ngx.NOTICE, string.format("get_ro_txn: i=%d", i))
+            end
+            local txn = ro_txns[i]
+            ro_txns[i] = nil
+            local err = txn_renew(txn)
+            if err ~= nil then
+                return nil, err
+            end
+            return txn
+        end
+
+        return readonly_txn_begin(nil)
+    end
+
+    local function put_ro_txn(txn)
+        S.nal_txn_reset(txn)
+        table.insert(ro_txns, txn)
+    end
+
+    local function with_readonly_txn(f)
+        local txn, err = get_ro_txn()
         if err ~= nil then
             return err
         end
 
-        err = f(txn)
-        if err ~= nil then
-            txn_abort(txn)
-            return err
-        end
-        return txn_commit(txn)
+        local err = f(txn)
+        put_ro_txn(txn)
+        return err
+    end
+
+    local function get(key, db)
+        local val
+        local err = with_txn(nil, function(txn)
+            local dbi, err = txn:readonly_db_open(db)
+            if err ~= nil then
+                return err
+            end
+
+            val, err = txn:get(key, dbi)
+            if err ~= nil then
+                return err
+            end
+
+            return nil
+        end)
+	return val, err
     end
 
     return {
         env_init = env_init,
         with_txn = with_txn,
         with_readonly_txn = with_readonly_txn,
+        get = get,
     }
 end
 
