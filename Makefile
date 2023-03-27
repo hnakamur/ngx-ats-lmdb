@@ -147,4 +147,4 @@ objs/stderr/nal_lmdb.o: src/nal_lmdb.c $(NAL_HEADERS) $(LOG_STDERR_HEADERS)
 	$(CC) -c $(TEST_CFLAGS) -o $@ $<
 
 clean:
-	@rm -r objs core.* $(TEST_DB_DIR)
+	@rm -rf objs core.* $(TEST_DB_DIR)
