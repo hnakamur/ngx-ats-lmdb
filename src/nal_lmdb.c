@@ -8,8 +8,9 @@
 
 typedef struct nal_env_s {
     const char *env_path;
-    size_t max_databases;
     size_t map_size;
+    size_t max_databases;
+    unsigned int max_readers;
     MDB_env *env;
 } nal_env_t;
 
@@ -26,15 +27,21 @@ static void nal_do_init_env(void)
         goto exit;
     }
 
-    rc = mdb_env_set_mapsize(env.env, env.map_size);
-    if (rc != 0) {
-        nal_log_error("mdb_env_set_mapsize failed: %s", mdb_strerror(rc));
-        goto exit;
-    }
-
     rc = mdb_env_set_maxdbs(env.env, env.max_databases);
     if (rc != 0) {
         nal_log_error("mdb_env_set_maxdbs failed: %s", mdb_strerror(rc));
+        goto exit;
+    }
+
+    rc = mdb_env_set_maxreaders(env.env, env.max_readers);
+    if (rc != 0) {
+        nal_log_error("mdb_env_set_maxreaders failed: %s", mdb_strerror(rc));
+        goto exit;
+    }
+
+    rc = mdb_env_set_mapsize(env.env, env.map_size);
+    if (rc != 0) {
+        nal_log_error("mdb_env_set_mapsize failed: %s", mdb_strerror(rc));
         goto exit;
     }
 
@@ -59,11 +66,13 @@ exit:
     env_init_rc = rc;
 }
 
-int nal_env_init(const char *env_path, size_t max_databases, size_t map_size)
+int nal_env_init(const char *env_path, size_t max_databases,
+                 unsigned int max_readers, size_t map_size)
 {
     nal_log_note("nal_env_init start");
     env.env_path = env_path;
     env.max_databases = max_databases;
+    env.max_readers = max_readers;
     env.map_size = map_size;
     (void)pthread_once(&env_init_once, nal_do_init_env);
     return env_init_rc;
@@ -85,7 +94,7 @@ int nal_txn_begin(nal_txn_ptr parent, nal_txn_ptr *txn)
 int nal_readonly_txn_begin(nal_txn_ptr parent, nal_txn_ptr *txn)
 {
     MDB_txn *out;
-    int rc = mdb_txn_begin(env.env, parent, MDB_RDONLY, &out);
+    int rc = mdb_txn_begin(env.env, (MDB_txn *)parent, MDB_RDONLY, &out);
     *txn = out;
     return rc;
 }
@@ -98,6 +107,16 @@ int nal_txn_commit(nal_txn_ptr txn)
 void nal_txn_abort(nal_txn_ptr txn)
 {
     mdb_txn_abort(txn);
+}
+
+int nal_txn_renew(nal_txn_ptr txn)
+{
+    return mdb_txn_renew(txn);
+}
+
+void nal_txn_reset(nal_txn_ptr txn)
+{
+    mdb_txn_reset(txn);
 }
 
 int nal_dbi_open(nal_txn_ptr txn, const char *name, nal_dbi *dbi)
