@@ -20,7 +20,6 @@ static nal_env_t env;
 
 static void nal_do_init_env(void)
 {
-    nal_log_note("nal_do_init_env start");
     int rc = mdb_env_create(&env.env);
     if (rc != 0) {
         nal_log_error("mdb_env_create failed: %s", mdb_strerror(rc));
@@ -69,7 +68,6 @@ exit:
 int nal_env_init(const char *env_path, size_t max_databases,
                  unsigned int max_readers, size_t map_size)
 {
-    nal_log_note("nal_env_init start");
     env.env_path = env_path;
     env.max_databases = max_databases;
     env.max_readers = max_readers;
