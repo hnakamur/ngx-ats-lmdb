@@ -2,9 +2,10 @@
 #define NAL_LMDB_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 int nal_env_init(const char *env_path, size_t max_databases,
-                 unsigned int max_readers, size_t map_size);
+                 unsigned int max_readers, size_t map_size, uint32_t file_mode);
 
 typedef struct MDB_txn *nal_txn_ptr;
 typedef unsigned int nal_dbi;
