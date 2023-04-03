@@ -1,7 +1,6 @@
 #include "nal_lmdb.h"
 
 #include <lmdb.h>
-#include <kstring.h>
 #include <pthread.h>
 
 #include "nal_log.h"
