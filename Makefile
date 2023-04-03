@@ -1,4 +1,4 @@
-CC =	   clang
+CC =	   cc
 LINK =	   $(CC)
 COV =      llvm-cov
 PROFDATA = llvm-profdata
