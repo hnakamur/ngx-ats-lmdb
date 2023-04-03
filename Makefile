@@ -3,7 +3,11 @@ LINK =	   $(CC)
 COV =      llvm-cov
 PROFDATA = llvm-profdata
 
-INCS = -Isrc -Ilib/log -Ideps/klib -I/usr/include/luajit-2.1
+export MULTILIB= lib
+
+PREFIX ?= /usr
+
+INCS = -Isrc -Ilib/log -I/usr/include/luajit-2.1
 WARNING_FLAGS = -Wall -Wno-unused-value -Wno-unused-function -Wno-nullability-completeness -Wno-expansion-to-defined -Werror=implicit-function-declaration -Werror=incompatible-pointer-types
 COMMON_CFLAGS = $(INCS) -pipe $(WARNING_FLAGS)
 COV_FLAGS = -fprofile-instr-generate -fcoverage-mapping
@@ -15,7 +19,7 @@ NGX_CFLAGS = -DNAL_LOG_NGX -O2 -fPIC $(COMMON_CFLAGS)
 #TEST_LOG_FLAG = -DNAL_LOG_NOP
 TEST_LOG_FLAG = -DNAL_LOG_STDERR -DDDEBUG
 
-TEST_CFLAGS = $(TEST_LOG_FLAG) -DUNITY_INCLUDE_DOUBLE -O0 -g3 -Ideps/test/unity $(COV_FLAGS) $(COMMON_CFLAGS)
+TEST_CFLAGS = $(TEST_LOG_FLAG) -DUNITY_INCLUDE_DOUBLE -O0 -g3 $(COV_FLAGS) $(COMMON_CFLAGS)
 
 STDERR_CFLAGS = -DNAL_LOG_STDERR -DDDEBUG -O0 -g3 -fPIC $(COMMON_CFLAGS)
 
@@ -56,7 +60,7 @@ NAL_NGX_OBJS = objs/ngx/nal_log_ngx.o \
 
 NAL_TEST_OBJS = objs/test/nal_log_stderr.o \
                 objs/test/nal_lmdb.o \
-				objs/test/unity.o \
+                objs/test/unity.o \
 
 NAL_STDERR_OBJS = objs/stderr/nal_log_stderr.o \
                   objs/stderr/nal_lmdb.o \
@@ -66,15 +70,16 @@ SHLIBS = objs/libnal_lmdb_ats.so \
 
 INSTALL_LUA_FILES = nal_lmdb_ats.lua \
                     nal_lmdb_ngx.lua \
-                    nal_lmdb_setup.lua
+                    nal_lmdb_setup.lua \
+                    nal_lmdb_stderr.lua
 
 TEST_DB_DIR = /tmp/test_lmdb
 
 build: $(SHLIBS)
 
 install: $(SHLIBS)
-	sudo install $(SHLIBS) /usr/lib/x86_64-linux-gnu/
-	sudo install $(INSTALL_LUA_FILES) /usr/local/share/lua/5.1/
+	install -D -t $(DESTDIR)$(PREFIX)/$(MULTILIB)/ $(SHLIBS)
+	install -D -t $(DESTDIR)$(PREFIX)/share/luajit-2.1.0-beta3/ $(INSTALL_LUA_FILES) 
 
 example: objs/libnal_lmdb_stderr.so
 	@mkdir -p $(TEST_DB_DIR)
@@ -147,3 +152,7 @@ objs/stderr/nal_lmdb.o: src/nal_lmdb.c $(NAL_HEADERS) $(LOG_STDERR_HEADERS)
 
 clean:
 	@rm -rf objs core.* $(TEST_DB_DIR)
+
+distclean: clean
+
+.PHONY: install clean distclean
