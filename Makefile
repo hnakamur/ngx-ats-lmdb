@@ -93,7 +93,6 @@ objs/shdict_test: test/main.c $(NAL_TEST_OBJS)
 
 format:
 	ls src/*.[ch] | xargs clang-format -i -style=file
-#	ls src/*.[ch] test/*.[ch] benchmark/*.[ch] | xargs clang-format -i -style=file
 
 # build SHLIBS
 
