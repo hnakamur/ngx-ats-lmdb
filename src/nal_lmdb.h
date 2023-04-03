@@ -5,7 +5,8 @@
 #include <stdint.h>
 
 int nal_env_init(const char *env_path, size_t max_databases,
-                 unsigned int max_readers, size_t map_size, uint32_t file_mode);
+                 unsigned int max_readers, size_t map_size, uint32_t file_mode,
+                 int use_tls);
 
 typedef struct MDB_txn *nal_txn_ptr;
 typedef unsigned int nal_dbi;

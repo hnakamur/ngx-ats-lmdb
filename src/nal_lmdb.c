@@ -12,6 +12,7 @@ typedef struct nal_env_s {
     size_t max_databases;
     unsigned int max_readers;
     mdb_mode_t file_mode;
+    int use_tls;
     MDB_env *env;
 } nal_env_t;
 
@@ -45,7 +46,7 @@ static void nal_do_init_env(void)
         goto exit;
     }
 
-    unsigned int flags = 0;
+    unsigned int flags = env.use_tls ? 0 : MDB_NOTLS;
     rc = mdb_env_open(env.env, env.env_path, flags, env.file_mode);
     if (rc != 0) {
         nal_log_error("mdb_env_open failed: %s", mdb_strerror(rc));
@@ -61,18 +62,20 @@ static void nal_do_init_env(void)
     }
 
 exit:
-    nal_log_note("nal_do_init_env exit: rc=%d", rc);
+    nal_log_note("nal_do_init_env exit: use_tls=%d, rc=%d", env.use_tls, rc);
     env_init_rc = rc;
 }
 
 int nal_env_init(const char *env_path, size_t max_databases,
-                 unsigned int max_readers, size_t map_size, uint32_t file_mode)
+                 unsigned int max_readers, size_t map_size, uint32_t file_mode,
+                 int use_tls)
 {
     env.env_path = env_path;
     env.max_databases = max_databases;
     env.max_readers = max_readers;
     env.map_size = map_size;
     env.file_mode = (mdb_mode_t)file_mode;
+    env.use_tls = use_tls;
     (void)pthread_once(&env_init_once, nal_do_init_env);
     return env_init_rc;
 }

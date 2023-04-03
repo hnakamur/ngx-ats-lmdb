@@ -4,7 +4,8 @@ local function setup(shlib_name)
 
     ffi.cdef[[
         int nal_env_init(const char *env_path, size_t max_databases,
-                         unsigned int max_readers, size_t map_size, uint32_t file_mode);
+                         unsigned int max_readers, size_t map_size, uint32_t file_mode,
+                         int use_tls);
 
         typedef struct MDB_txn * nal_txn_ptr;
         typedef unsigned int     nal_dbi;
@@ -38,8 +39,9 @@ local function setup(shlib_name)
         return ffi.string(S.nal_strerror(err))
     end
 
-    local function env_init(env_path, max_databases, max_readers, map_size, file_mode)
-        local rc = S.nal_env_init(env_path, max_databases, max_readers, map_size, file_mode)
+    local function env_init(env_path, max_databases, max_readers, map_size, file_mode, use_tls)
+        -- use 0 if use_tls is nil
+        local rc = S.nal_env_init(env_path, max_databases, max_readers, map_size, file_mode, use_tls or 0)
         if rc ~= MDB_SUCCESS then
             return nal_strerror(rc)
         end

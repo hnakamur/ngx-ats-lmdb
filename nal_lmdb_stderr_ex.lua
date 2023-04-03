@@ -5,7 +5,8 @@ local max_databases = 20
 local max_readers = 128
 local map_size = 50 * 1024 * 1024
 local file_mode = tonumber('666', 8)
-local err = lmdb.env_init(env_path, max_databases, max_readers, map_size, file_mode)
+local use_tls = false
+local err = lmdb.env_init(env_path, max_databases, max_readers, map_size, file_mode, use_tls)
 print(string.format("env_init err=%s", err))
 
 err = lmdb.open_databases({"db1"})
