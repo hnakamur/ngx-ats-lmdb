@@ -137,7 +137,7 @@ local function setup(shlib_name)
 
     ffi.metatype("struct MDB_txn", txn_mt)
 
-    local function with_txn(f)
+    local function update(f)
         local txn, err = txn_begin(nil)
         if err ~= nil then
             return err
@@ -169,7 +169,7 @@ local function setup(shlib_name)
         table.insert(ro_txns, txn)
     end
 
-    local function with_readonly_txn(f)
+    local function view(f)
         local txn, err = get_ro_txn()
         if err ~= nil then
             return err
@@ -181,7 +181,7 @@ local function setup(shlib_name)
     end
 
     local function open_databases(databases)
-        return with_txn(function(txn)
+        return update(function(txn)
             for i, db in ipairs(databases) do
                 local dbi, err = dbi_open(txn, db)
                 if err ~= nil then
@@ -194,7 +194,7 @@ local function setup(shlib_name)
 
     local function get(key, db)
         local val
-        local err = with_readonly_txn(function(txn)
+        local err = view(function(txn)
             local err2
             val, err2 = txn:get(key, db)
             if err2 ~= nil then
@@ -208,8 +208,8 @@ local function setup(shlib_name)
 
     return {
         env_init = env_init,
-        with_txn = with_txn,
-        with_readonly_txn = with_readonly_txn,
+        update = update,
+        view = view,
         open_databases = open_databases,
         get = get,
     }
