@@ -85,6 +85,10 @@ example: objs/libnal_lmdb_stderr.so
 	@mkdir -p $(TEST_DB_DIR)
 	LD_LIBRARY_PATH=objs luajit nal_lmdb_stderr_ex.lua
 
+example2: objs/libnal_lmdb_stderr.so
+	@mkdir -p $(TEST_DB_DIR)
+	LD_LIBRARY_PATH=objs luajit nal_lmdb_stderr_ex2.lua
+
 test: objs/shdict_test
 	LLVM_PROFILE_FILE=objs/shdict_test.profraw objs/shdict_test
 
@@ -144,11 +148,11 @@ objs/test/unity.o: test/unity/unity.c $(UNITY_DEPS)
 
 objs/stderr/nal_log_stderr.o: lib/log/nal_log_stderr.c $(LOG_STDERR_HEADERS)
 	@mkdir -p objs/stderr
-	$(CC) -c $(TEST_CFLAGS) -o $@ $<
+	$(CC) -c $(STDERR_CFLAGS) -o $@ $<
 
 objs/stderr/nal_lmdb.o: src/nal_lmdb.c $(NAL_HEADERS) $(LOG_STDERR_HEADERS)
 	@mkdir -p objs/stderr
-	$(CC) -c $(TEST_CFLAGS) -o $@ $<
+	$(CC) -c $(STDERR_CFLAGS) -o $@ $<
 
 clean:
 	@rm -rf objs core.* $(TEST_DB_DIR)

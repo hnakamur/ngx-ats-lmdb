@@ -98,26 +98,38 @@ local function setup(shlib_name)
     txn_mt.__index = txn_mt
 
     function txn_mt:get(key, db)
+        local val, val_len, err = self:get_raw(key, #key, db)
+        if val == nil then
+            return nil, err
+        end
+        return ffi.string(val, val_len)
+    end
+
+    function txn_mt:get_raw(key, key_len, db)
         local nal_key = ffi.new(c_val_type)
-        nal_key[0].mv_size = #key
+        nal_key[0].mv_size = key_len
         nal_key[0].mv_data = key
         local nal_data = ffi.new(c_val_type)
         local rc = S.nal_get(self, dbis[db], nal_key, nal_data)
         if rc ~= 0 then
             if rc == MDB_NOTFOUND then
-                return nil
+                return nil, 0
             end
-            return nil, nal_strerror(rc)
+            return nil, 0, nal_strerror(rc)
         end
-        return ffi.string(nal_data[0].mv_data, nal_data[0].mv_size)
+        return nal_data[0].mv_data, nal_data[0].mv_size
     end
 
     function txn_mt:set(key, data, db)
+        return self:set_raw(key, #key, data, #data, db)
+    end
+
+    function txn_mt:set_raw(key, key_len, data, data_len, db)
         local nal_key = ffi.new(c_val_type)
         local nal_data = ffi.new(c_val_type)
-        nal_key[0].mv_size = #key
+        nal_key[0].mv_size = key_len
         nal_key[0].mv_data = key
-        nal_data[0].mv_size = #data
+        nal_data[0].mv_size = data_len
         nal_data[0].mv_data = data
         local rc = S.nal_put(self, dbis[db], nal_key, nal_data)
         if rc ~= MDB_SUCCESS then
@@ -127,8 +139,12 @@ local function setup(shlib_name)
     end
 
     function txn_mt:del(key, db)
+        return self:del_raw(key, #key, db)
+    end
+
+    function txn_mt:del_raw(key, key_len, db)
         local nal_key = ffi.new(c_val_type)
-        nal_key[0].mv_size = #key
+        nal_key[0].mv_size = key_len
         nal_key[0].mv_data = key
         local rc = S.nal_del(self, dbis[db], nal_key)
         if rc ~= 0 and rc ~= MDB_NOTFOUND then
