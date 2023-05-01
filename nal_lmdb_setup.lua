@@ -7,27 +7,12 @@ local function setup(shlib_name)
                          unsigned int max_readers, size_t map_size, uint32_t file_mode,
                          int use_tls);
 
-        typedef struct MDB_txn * nal_txn_ptr;
-        typedef unsigned int     nal_dbi;
-        typedef struct nal_val {
+        typedef unsigned int     MDB_dbi;
+        typedef struct MDB_val {
             size_t      mv_size;
             const char *mv_data;
-        } nal_val;
+        } MDB_val;
 
-        const char *nal_strerror(int err);
-        int nal_txn_begin(nal_txn_ptr parent, nal_txn_ptr *txn);
-        int nal_readonly_txn_begin(nal_txn_ptr parent, nal_txn_ptr *txn);
-        int nal_txn_commit(nal_txn_ptr txn);
-        void nal_txn_abort(nal_txn_ptr txn);
-        int nal_txn_renew(nal_txn_ptr txn);
-        void nal_txn_reset(nal_txn_ptr txn);
-        int nal_dbi_open(nal_txn_ptr txn, const char *name, nal_dbi *dbi);
-        int nal_readonly_dbi_open(nal_txn_ptr txn, const char *name, nal_dbi *dbi);
-        int nal_put(nal_txn_ptr txn, nal_dbi dbi, nal_val *key, nal_val *data);
-        int nal_del(nal_txn_ptr txn, nal_dbi dbi, nal_val *key);
-        int nal_get(nal_txn_ptr txn, nal_dbi dbi, nal_val *key, nal_val *data);
-
-        typedef struct MDB_cursor *nal_cursor_ptr;
         typedef enum MDB_cursor_op {
             MDB_FIRST,				/**< Position at first key/data item */
             MDB_FIRST_DUP,			/**< Position at first data item of current key.
@@ -58,8 +43,6 @@ local function setup(shlib_name)
             MDB_PREV_MULTIPLE		/**< Position at previous page and return up to
                                         a page of duplicate data items. Only for #MDB_DUPFIXED */
         } MDB_cursor_op;
-        
-        int nal_cursor_open(nal_txn_ptr txn, nal_dbi dbi, nal_cursor_ptr *cursor);
 
         typedef struct MDB_txn *nal_txn_ptr;
         typedef struct MDB_cursor *nal_cursor_ptr;
@@ -84,16 +67,16 @@ local function setup(shlib_name)
 
         int nal_cursor_open(nal_txn_ptr txn, MDB_dbi dbi, nal_cursor_ptr *cursor);
         void nal_cursor_close(nal_cursor_ptr cursor);
-        int nal_cursor_get(nal_cursor_ptr cursor, nal_val *key, nal_val *data,
+        int nal_cursor_get(nal_cursor_ptr cursor, MDB_val *key, MDB_val *data,
                            MDB_cursor_op op);
-        int nal_cursor_put(nal_cursor_ptr cursor, nal_val *key, nal_val *data,
+        int nal_cursor_put(nal_cursor_ptr cursor, MDB_val *key, MDB_val *data,
                            unsigned int flags);
         int nal_cursor_del(nal_cursor_ptr cursor, unsigned int flags);
     ]]
 
     local c_txn_ptr_type = ffi.typeof("nal_txn_ptr[1]")
-    local c_dbi_type = ffi.typeof("nal_dbi[1]")
-    local c_val_type = ffi.typeof("nal_val[1]")
+    local c_dbi_type = ffi.typeof("MDB_dbi[1]")
+    local c_val_type = ffi.typeof("MDB_val[1]")
     local c_cursor_ptr_type = ffi.typeof("nal_cursor_ptr[1]")
 
     local MDB_SUCCESS = 0
