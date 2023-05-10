@@ -89,6 +89,10 @@ example2: objs/libnal_lmdb_stderr.so
 	@mkdir -p $(TEST_DB_DIR)
 	LD_LIBRARY_PATH=objs luajit nal_lmdb_stderr_ex2.lua
 
+example3: objs/libnal_lmdb_stderr.so
+	@mkdir -p $(TEST_DB_DIR)
+	LD_LIBRARY_PATH=objs luajit nal_lmdb_stderr_ex3.lua
+
 test: objs/shdict_test
 	LLVM_PROFILE_FILE=objs/shdict_test.profraw objs/shdict_test
 
