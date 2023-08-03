@@ -66,7 +66,8 @@ NAL_STDERR_OBJS = objs/stderr/nal_log_stderr.o \
                   objs/stderr/nal_lmdb.o \
 
 SHLIBS = objs/libnal_lmdb_ats.so \
-         objs/libnal_lmdb_ngx.so
+         objs/libnal_lmdb_ngx.so \
+         objs/libnal_lmdb_stderr.so
 
 INSTALL_LUA_FILES = nal_lmdb_ats.lua \
                     nal_lmdb_ngx.lua \
