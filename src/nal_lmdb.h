@@ -10,7 +10,7 @@ typedef struct MDB_cursor *nal_cursor_ptr;
 
 int nal_env_init(const char *env_path, size_t max_databases,
                  unsigned int max_readers, size_t map_size, uint32_t file_mode,
-                 int use_tls);
+                 int use_tls, int read_only);
 
 const char *nal_strerror(int err);
 
