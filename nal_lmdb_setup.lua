@@ -118,6 +118,15 @@ local function setup(shlib_name)
         return dbi[0]
     end
 
+    local function readonly_dbi_open(txn, name)
+        local dbi = ffi.new(c_dbi_type)
+        local rc = S.nal_readonly_dbi_open(txn, name, dbi)
+        if rc ~= MDB_SUCCESS then
+            return nil, nal_strerror(rc)
+        end
+        return dbi[0]
+    end
+
     local function txn_commit(txn)
         local rc = S.nal_txn_commit(txn)
         if rc ~= MDB_SUCCESS then
@@ -325,10 +334,16 @@ local function setup(shlib_name)
         return err
     end
 
-    local function open_databases(databases)
-        return update(function(txn)
+    local function open_databases(databases, read_only)
+        local txn_fn = update
+        local open_fn = dbi_open
+        if read_only then
+            txn_fn = view
+            open_fn = readonly_dbi_open
+        end
+        return txn_fn(function(txn)
             for i, db in ipairs(databases) do
-                local dbi, err = dbi_open(txn, db)
+                local dbi, err = open_fn(txn, db)
                 if err ~= nil then
                     return err
                 end
